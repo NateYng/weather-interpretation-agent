@@ -32,21 +32,21 @@ const els = {
   btnIdeas: document.getElementById('btnIdeas'),
   btnCloseIdeas: document.getElementById('btnCloseIdeas'),
   btnClear: document.getElementById('btnClear'),
-  btnSettings: document.getElementById('btnSettings'),
-  settingsDialog: document.getElementById('settingsDialog'),
   statusDot: document.getElementById('statusDot'),
   headerMode: document.getElementById('headerMode'),
 };
 
 const BOT_GLYPH = `<img src="assets/logo.png" alt="云遥宇航" />`;
 
+/** 内置大模型接口（固定配置，用户无需设置；调用失败自动回退本地知识引擎） */
+const LLM_CONFIG = {
+  base: 'https://new-api.geekstorm.com.cn/v1',
+  key: 'e4FycFzvMyzPnQkJgSHfhvZtVisG7xMepnHjGEZW9dU4qCEh',
+  model: 'qwen3.6-flash',
+};
+
 function getLLMConfig() {
-  try {
-    const raw = localStorage.getItem('wia_llm');
-    if (!raw) return null;
-    const cfg = JSON.parse(raw);
-    return cfg.base && cfg.key && cfg.model ? cfg : null;
-  } catch { return null; }
+  return LLM_CONFIG;
 }
 
 /* ---------- 工具 ---------- */
@@ -393,38 +393,10 @@ els.btnCloseIdeas.addEventListener('click', () => openIdeas(false));
 els.scrim.addEventListener('click', () => openIdeas(false));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') openIdeas(false); });
 
-// 设置弹窗
-els.btnSettings.addEventListener('click', () => {
-  const cfg = getLLMConfig() || {};
-  document.getElementById('llmBase').value = cfg.base || '';
-  document.getElementById('llmKey').value = cfg.key || '';
-  document.getElementById('llmModel').value = cfg.model || '';
-  els.settingsDialog.showModal();
-});
-
-document.getElementById('btnSaveSettings').addEventListener('click', () => {
-  const base = document.getElementById('llmBase').value.trim();
-  const key = document.getElementById('llmKey').value.trim();
-  const model = document.getElementById('llmModel').value.trim();
-  if (base && key && model) {
-    localStorage.setItem('wia_llm', JSON.stringify({ base, key, model }));
-  } else {
-    localStorage.removeItem('wia_llm');
-  }
-  refreshMode();
-});
-
 function refreshMode() {
-  const llm = getLLMConfig();
-  if (llm) {
-    els.statusDot.classList.add('llm');
-    els.headerMode.textContent = `全能模式 · ${llm.model}`;
-    els.headerMode.parentElement.title = '大模型自主调用知识库 / 气象 / 时间 / 搜索四个工具，可回答任意问题';
-  } else {
-    els.statusDot.classList.remove('llm');
-    els.headerMode.textContent = '本地知识引擎';
-    els.headerMode.parentElement.title = '零成本、可离线，答案 100% 来自知识库；在设置中配置模型可升级全能模式';
-  }
+  els.statusDot.classList.add('llm');
+  els.headerMode.textContent = '全能模式';
+  els.headerMode.parentElement.title = '内置大模型自主调用知识库 / 气象 / 时间 / 搜索四个工具，可回答任意问题；调用失败自动回退本地知识引擎';
 }
 
 /* ---------- 启动 ---------- */

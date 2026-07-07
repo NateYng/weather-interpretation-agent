@@ -9,8 +9,8 @@
 - **拒答机制**：库外问题明确说明"没有依据"，绝不编造标准和阈值
 - **实时天气解读**：调用 Open-Meteo Geocoding + Forecast API，按知识库阈值规则自动识别风险并输出逐小时依据
 - **多轮上下文**：追问时按上一轮命中条目加权检索
-- **全能模式（可选）**：填入任意 OpenAI 兼容 Key 后，大模型通过 function calling 自主调度四个工具——📚 知识库检索、🌦️ 气象 API（Open-Meteo）、🕐 时间 API（timeapi.io）、🔎 联网搜索（维基百科 + DuckDuckGo），可回答**任意主题的问题**；气象专业问题仍强制先查知识库并引用来源，每次调用的工具链完整展示；失败自动回退本地引擎
-- **零后端、零构建、零密钥**：纯静态站点，任何静态托管平台可直接发布（全能模式的 Key 由用户自备，仅存浏览器本地）
+- **全能模式（默认开启，内置模型）**：内置 OpenAI 兼容接口（qwen3.6-flash），大模型通过 function calling 自主调度四个工具——📚 知识库检索、🌦️ 气象 API（Open-Meteo）、🕐 时间 API（timeapi.io）、🔎 联网搜索（维基百科 + DuckDuckGo），可回答**任意主题的问题**，用户无需任何配置；气象专业问题仍强制先查知识库并引用来源，每次调用的工具链完整展示；模型调用失败自动回退本地引擎
+- **零后端、零构建**：纯静态站点，任何静态托管平台可直接发布
 
 ## 本地运行
 
@@ -75,6 +75,7 @@ npx wrangler pages deploy .
 
 ## 知识库维护
 
+- 内置模型：接口地址与模型名固定在 `src/app.js` 的 `LLM_CONFIG` 常量中，更换供应商只需改这一处
 - 新增知识：在 `src/kb.js` 的 `KB` 数组中追加条目（id/category/title/keywords/answer/sources/safety/followups）
 - 每次修改后运行 `node tests/eval.mjs` 回归验证，并为新条目在 `tests/eval.mjs` 中添加检索用例
 - 来源新增：在 `SOURCES` 表中登记名称与文件路径，保证可追溯

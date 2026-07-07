@@ -71,7 +71,6 @@ body {
 .brand-logo {
   width: 34px; height: 34px; flex-shrink: 0;
   object-fit: contain;
-  mix-blend-mode: multiply; /* 白底 logo 融入米色背景 */
 }
 .brand-name {
   font-family: var(--serif);
@@ -135,7 +134,6 @@ body {
 .hero-logo {
   width: 76px; height: 76px;
   object-fit: contain;
-  mix-blend-mode: multiply;
   margin-bottom: 14px;
 }
 .hero-title {
@@ -208,7 +206,7 @@ body {
 .msg.bot .avatar {
   width: 28px; height: 28px; flex-shrink: 0; margin-top: 2px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
   display: grid; place-items: center;
   overflow: hidden;
@@ -410,45 +408,6 @@ body {
   animation: fade .2s ease both;
 }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-
-/* ---------- 设置弹窗 ---------- */
-.settings-dialog {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--surface); color: var(--ink);
-  width: min(480px, 92vw);
-  padding: 0;
-  box-shadow: var(--shadow-lg);
-}
-.settings-dialog::backdrop { background: rgba(33, 32, 28, .35); backdrop-filter: blur(3px); }
-.settings-form { padding: 28px; display: flex; flex-direction: column; gap: 15px; }
-.settings-form h2 { font-family: var(--serif); font-size: 20px; font-weight: 600; }
-.settings-desc { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
-.settings-desc strong { color: var(--accent); font-weight: 600; }
-.settings-form label {
-  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
-  display: flex; flex-direction: column; gap: 6px;
-}
-.settings-form input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--ink);
-  padding: 10px 13px; font: inherit; font-weight: 400;
-  outline: none;
-  transition: border-color .15s ease;
-}
-.settings-form input:focus { border-color: var(--accent); }
-.settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
-.btn {
-  font: inherit; font-size: 14px;
-  border-radius: 10px; padding: 8px 18px; cursor: pointer;
-  transition: background .15s ease, border-color .15s ease;
-}
-.btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--ink-2); }
-.btn.ghost:hover { border-color: var(--border-strong); color: var(--ink); }
-.btn.solid { background: var(--accent); border: 1px solid var(--accent); color: #fff; }
-.btn.solid:hover { background: var(--accent-hover); }
 
 /* 回退提示 */
 .fallback-note { color: var(--warn); font-size: 12px; margin-bottom: 8px; }
