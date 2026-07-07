@@ -1,0 +1,11 @@
+{
+  "name": "weather-interpretation-agent",
+  "version": "1.0.0",
+  "description": "气象预报解读助手：知识问答类 Agent（纯静态站点，零后端依赖）",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/eval.mjs",
+    "start": "python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}

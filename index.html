@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>气象预报解读助手</title>
+  <meta name="description" content="气象预报解读助手：解释天气预报、预警预报、气象指标与 AI 气象预报模型，基于 WMO 指南与 GraphCast / Pangu-Weather 论文构建的知识问答 Agent。" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌦️</text></svg>" />
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边栏：品牌 + 推荐问题 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-icon">🌦️</div>
+        <div>
+          <h1>气象预报解读助手</h1>
+          <p class="brand-sub">把预报讲成人话 · 依据可追溯</p>
+        </div>
+      </div>
+
+      <div class="kb-stats" id="kbStats"></div>
+
+      <nav class="suggest-nav" id="suggestNav" aria-label="推荐问题"></nav>
+
+      <div class="sidebar-footer">
+        <button class="btn-ghost" id="btnSettings">⚙️ 设置（可选 LLM 增强）</button>
+        <p class="disclaimer">本助手仅提供预报知识解读。涉及安全、作业、出行、应急的决策，请以当地气象部门发布的<strong>最新官方预报和预警</strong>为准。</p>
+      </div>
+    </aside>
+
+    <!-- 主聊天区 -->
+    <main class="chat-area">
+      <header class="chat-header">
+        <button class="btn-ghost mobile-only" id="btnToggleSidebar">☰</button>
+        <div class="header-title">
+          <span class="status-dot" id="statusDot" title="引擎状态"></span>
+          <span id="headerMode">本地知识引擎 · 无需联网即可问答</span>
+        </div>
+        <button class="btn-ghost" id="btnClear" title="清空对话">🗑 新对话</button>
+      </header>
+
+      <div class="messages" id="messages" aria-live="polite"></div>
+
+      <footer class="composer">
+        <div class="quick-chips" id="quickChips"></div>
+        <form id="composerForm" class="composer-form">
+          <textarea id="input" rows="1" placeholder="例如：降水概率 70% 是什么意思？ / 现在深圳的天气适合户外活动吗？" autocomplete="off"></textarea>
+          <button type="submit" id="btnSend" class="btn-send" aria-label="发送">➤</button>
+        </form>
+        <p class="composer-hint">Enter 发送 · Shift+Enter 换行 · 回答依据来自 WMO 指南 / GraphCast / Pangu-Weather 论文 / Open-Meteo 文档</p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- 设置弹窗：可选 LLM 增强 -->
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog" class="settings-form">
+      <h2>可选：LLM 语言润色增强</h2>
+      <p class="settings-desc">默认使用<strong>纯本地检索引擎</strong>回答（零成本、可离线、答案 100% 来自知识库）。如需更自然的语言组织，可填入任意 OpenAI 兼容接口的 Key，LLM 仅被允许基于检索到的知识库片段改写措辞，不允许新增事实。</p>
+      <label>API Base URL
+        <input type="text" id="llmBase" placeholder="https://api.openai.com/v1（或兼容接口）" />
+      </label>
+      <label>API Key
+        <input type="password" id="llmKey" placeholder="sk-...（仅存于浏览器本地，不上传）" />
+      </label>
+      <label>模型名称
+        <input type="text" id="llmModel" placeholder="gpt-4o-mini / deepseek-chat 等" />
+      </label>
+      <div class="settings-actions">
+        <button value="cancel" class="btn-ghost">取消</button>
+        <button value="save" id="btnSaveSettings" class="btn-primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
