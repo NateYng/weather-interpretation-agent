@@ -36,7 +36,24 @@ const els = {
   headerMode: document.getElementById('headerMode'),
 };
 
-const BOT_GLYPH = `<img src="assets/logo.png" alt="云遥宇航" />`;
+const BOT_GLYPH = `<img src="assets/avatar.png" alt="气象预报解读助手" />`;
+
+/* 极简线性图标（1.5px 描边，取自手绘感线稿风格，替代 emoji） */
+const ICONS = {
+  book: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>`,
+  cloud: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.42-8.98 6 6 0 1 0-11.06 3.1A3.5 3.5 0 0 0 7 19h10.5Z"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2.3-2.9A8 8 0 1 1 21 12Z"/></svg>`,
+};
+
+/* 工具名 → 图标（用于回答尾部的工具链标签） */
+const TOOL_ICONS = {
+  search_knowledge_base: ICONS.book,
+  get_weather_forecast: ICONS.cloud,
+  get_current_time: ICONS.clock,
+  web_search: ICONS.search,
+};
 
 /** 内置大模型接口（固定配置，用户无需设置；调用失败自动回退本地知识引擎） */
 const LLM_CONFIG = {
@@ -124,9 +141,9 @@ function renderWeatherCard(interp) {
     <p><strong>${esc(interp.placeName)}</strong> 当前 ${esc(c.text)}，气温 ${c.temp}℃，湿度 ${c.humidity}%，风速 ${c.wind} km/h（阵风 ${c.gust} km/h，约 ${gustLevel(c.gust)} 级）。未来 12 小时综合天气风险 <span class="confidence ${riskColor}">${interp.riskLevel}</span></p>`;
 
   if (interp.risks.length) {
-    html += `<h4>风险识别</h4><ul>${interp.risks.map((r) => `<li>${r.level === 'high' ? '🔴' : r.level === 'mid' ? '🟡' : '🟢'} ${esc(r.text)}</li>`).join('')}</ul>`;
+    html += `<h4>风险识别</h4><ul class="risk-list">${interp.risks.map((r) => `<li><span class="risk-dot ${r.level}"></span>${esc(r.text)}</li>`).join('')}</ul>`;
   } else {
-    html += `<h4>风险识别</h4><p>🟢 未来 12 小时各项指标均在常规范围内，无明显天气风险信号。</p>`;
+    html += `<h4>风险识别</h4><p><span class="risk-dot low"></span>未来 12 小时各项指标均在常规范围内，无明显天气风险信号。</p>`;
   }
 
   const rows = interp.rows.slice(0, 8);
@@ -198,9 +215,9 @@ function renderAgentAnswer(content, toolTrace) {
   let html = renderMarkdown(content);
   if (toolTrace.length) {
     html += `<div class="sources">本次调用工具 ${toolTrace.map((t) =>
-      `<span class="src-tag" title="${esc(JSON.stringify(t.args))}">${esc(t.label)}${t.ok ? '' : '（失败）'}</span>`).join('')}</div>`;
+      `<span class="src-tag tool" title="${esc(JSON.stringify(t.args))}">${TOOL_ICONS[t.name] || ''}${esc(t.label)}${t.ok ? '' : '（失败）'}</span>`).join('')}</div>`;
   } else {
-    html += `<div class="sources">由大模型直接回答（未调用工具）</div>`;
+    html += `<div class="sources"><span class="src-tag tool">${ICONS.chat}由大模型直接回答（未调用工具）</span></div>`;
   }
   return html;
 }

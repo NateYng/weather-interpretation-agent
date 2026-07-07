@@ -183,10 +183,10 @@ async function execWebSearch({ query, language = 'zh' }) {
 
 /** 工具名 → 执行器 + 展示名 */
 export const TOOL_REGISTRY = {
-  search_knowledge_base: { exec: execSearchKnowledgeBase, label: '📚 知识库检索' },
-  get_weather_forecast: { exec: execGetWeather, label: '🌦️ 气象 API' },
-  get_current_time: { exec: execGetTime, label: '🕐 时间 API' },
-  web_search: { exec: execWebSearch, label: '🔎 联网搜索' },
+  search_knowledge_base: { exec: execSearchKnowledgeBase, label: '知识库检索' },
+  get_weather_forecast: { exec: execGetWeather, label: '气象数据' },
+  get_current_time: { exec: execGetTime, label: '时间查询' },
+  web_search: { exec: execWebSearch, label: '联网搜索' },
 };
 
 /** 执行一次工具调用，永不 throw（错误作为结果返回给 LLM 处理） */

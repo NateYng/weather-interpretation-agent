@@ -53,7 +53,7 @@ export async function runAgent(history, llmConfig, onStatus = () => {}) {
   const toolTrace = [];
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    onStatus(round === 0 ? '🧠 思考中…' : '🧠 综合工具结果…');
+    onStatus(round === 0 ? '思考中…' : '综合工具结果…');
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
