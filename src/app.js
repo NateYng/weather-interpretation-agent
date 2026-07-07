@@ -38,7 +38,7 @@ const els = {
   headerMode: document.getElementById('headerMode'),
 };
 
-const BOT_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.42-8.98 6 6 0 1 0-11.06 3.1A3.5 3.5 0 0 0 7 19h10.5Z"/></svg>`;
+const BOT_GLYPH = `<img src="assets/logo.png" alt="云遥宇航" />`;
 
 function getLLMConfig() {
   try {

@@ -6,19 +6,16 @@
   <title>气象预报解读助手</title>
   <meta name="description" content="气象预报解读助手：解释天气预报、预警预报、气象指标与 AI 气象预报模型，基于 WMO 指南与 GraphCast / Pangu-Weather 论文构建的知识问答 Agent。" />
   <link rel="stylesheet" href="assets/style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌤</text></svg>" />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
 </head>
 <body>
   <!-- 顶栏 -->
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <span class="brand-glyph" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17.5 19a4.5 4.5 0 1 0-.42-8.98 6 6 0 1 0-11.06 3.1A3.5 3.5 0 0 0 7 19h10.5Z"/>
-          </svg>
-        </span>
+        <img class="brand-logo" src="assets/logo.png" alt="云遥宇航" />
         <span class="brand-name">气象预报解读助手</span>
+        <span class="brand-by">by 云遥宇航</span>
         <span class="mode-pill" id="modePill" title="当前引擎模式">
           <span class="mode-dot" id="statusDot"></span>
           <span id="headerMode">本地知识引擎</span>
@@ -45,6 +42,7 @@
   <main class="page">
     <!-- 空状态 Hero -->
     <section class="hero" id="hero">
+      <img class="hero-logo" src="assets/logo.png" alt="云遥宇航" />
       <h1 class="hero-title" id="heroGreeting">把预报，讲成人话。</h1>
       <p class="hero-sub">解读天气预报、预警信号、气象指标与 AI 气象模型 —— 每个答案都有出处。</p>
       <div class="hero-cards" id="heroCards"></div>
@@ -63,7 +61,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
       </button>
     </form>
-    <p class="composer-hint">回答依据 WMO 指南 · GraphCast / Pangu-Weather 论文 · Open-Meteo 数据。安全决策请以官方预报预警为准。</p>
+    <p class="composer-hint">云遥宇航 · 回答依据 WMO 指南 / GraphCast / Pangu-Weather 论文 / Open-Meteo 数据 · 安全决策请以官方预报预警为准</p>
   </footer>
 
   <!-- 提问灵感抽屉 -->
