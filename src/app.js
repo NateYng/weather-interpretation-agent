@@ -75,7 +75,11 @@ const LLM_CONFIG = {
   model: 'qwen3.6-flash',
 };
 
+const URL_PARAMS = new URLSearchParams(location.search);
+
 function getLLMConfig() {
+  // 深链参数 engine=local 可强制使用本地知识引擎（演示/调试用）
+  if (URL_PARAMS.get('engine') === 'local') return null;
   return LLM_CONFIG;
 }
 
@@ -553,3 +557,18 @@ function refreshMode() {
 initHero();
 initIdeas();
 refreshMode();
+
+/* 深链参数：?q=问题 自动提问；?panel=history 打开历史抽屉（&seed=1 注入演示数据） */
+(function handleDeepLink() {
+  if (URL_PARAMS.get('panel') === 'history') {
+    if (URL_PARAMS.get('seed') === '1') {
+      const now = Date.now();
+      saveSession({ id: 'demo_1', title: '降水概率 70% 是什么意思？是不是一定会下雨？', createdAt: now - 86400000 * 2, updatedAt: now - 86400000 * 2, messages: [], chatHistory: [], userTexts: ['降水概率 70% 是什么意思？', '那7天预报可靠吗'] });
+      saveSession({ id: 'demo_2', title: '现在深圳的天气适合户外活动吗？', createdAt: now - 3600000 * 5, updatedAt: now - 3600000 * 5, messages: [], chatHistory: [], userTexts: ['现在深圳的天气适合户外活动吗？'] });
+      saveSession({ id: 'demo_3', title: 'GraphCast 和传统数值天气预报有什么不同？', createdAt: now - 600000, updatedAt: now - 600000, messages: [], chatHistory: [], userTexts: ['GraphCast 和传统数值天气预报有什么不同？', 'Pangu-Weather 呢？'] });
+    }
+    openHistory(true);
+  }
+  const q = URL_PARAMS.get('q');
+  if (q) handleUserInput(q);
+})();

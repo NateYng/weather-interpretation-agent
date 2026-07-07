@@ -77,11 +77,6 @@ body {
   font-size: 16.5px; font-weight: 600; letter-spacing: .02em;
   white-space: nowrap;
 }
-.brand-by {
-  font-size: 11.5px; color: var(--ink-3);
-  white-space: nowrap; letter-spacing: .03em;
-  transform: translateY(1px);
-}
 .mode-pill {
   display: inline-flex; align-items: center; gap: 6px;
   margin-left: 10px; padding: 3px 10px;
@@ -497,7 +492,6 @@ body {
   .icon-btn svg { width: 18px; height: 18px; }
   .mode-pill { max-width: 120px; padding: 3px 8px; }
   .brand-name { font-size: 14.5px; }
-  .brand-by { display: none; }
   .brand-logo { width: 30px; height: 30px; }
 
   /* Hero：单列卡片，收紧留白 */
@@ -516,8 +510,12 @@ body {
   .bubble table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
   .bubble th, .bubble td { padding: 6px 10px; }
 
+  .hero-title { font-size: 26px; }
+  .hero-sub { padding: 0 8px; }
+
   /* 输入区：贴边、触控友好 */
   .composer-wrap { padding: 6px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .composer-hint { padding: 0 10px; }
   .composer { border-radius: 20px; padding: 8px 8px 8px 15px; }
   .send-btn { width: 40px; height: 40px; }
   .composer-hint { font-size: 10px; }
