@@ -368,34 +368,4 @@ export function updateContext(ctx, { userText, answer }) {
   return ctx;
 }
 
-/* ============ LLM 可选增强（仅润色，不新增事实） ============ */
-
-export async function polishWithLLM(answerPayload, userQuery, llmConfig, fetchImpl = globalThis.fetch) {
-  const { base, key, model } = llmConfig;
-  const kbText = JSON.stringify(answerPayload.structured, null, 2);
-  const srcText = answerPayload.sources.map((s) => s.name).join('、');
-  const res = await fetchImpl(`${base.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0.3,
-      messages: [
-        {
-          role: 'system',
-          content: '你是气象预报解读助手的语言润色器。你只能基于提供的知识库片段改写措辞，使其更贴合用户的具体问法。严禁新增任何知识库片段中没有的事实、数字、标准或阈值。保持"结论/解释/影响/建议"的结构，用简体中文。',
-        },
-        {
-          role: 'user',
-          content: `用户问题：${userQuery}\n\n知识库片段（唯一事实来源）：\n${kbText}\n\n来源：${srcText}\n\n请基于以上片段，输出针对该问题的回答，JSON 格式：{"conclusion":"...","explain":"...","impact":"...","advice":"..."}`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-    }),
-  });
-  if (!res.ok) throw new Error(`LLM 接口错误（HTTP ${res.status}）`);
-  const json = await res.json();
-  const content = json.choices?.[0]?.message?.content;
-  const parsed = JSON.parse(content);
-  return { ...answerPayload, structured: { ...answerPayload.structured, ...parsed }, llmPolished: true };
-}
+// 说明：全能模式的 LLM 工具调用逻辑见 llm-agent.js（工具定义见 tools.js）。

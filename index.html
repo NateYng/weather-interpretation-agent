@@ -57,8 +57,8 @@
   <!-- 设置弹窗：可选 LLM 增强 -->
   <dialog id="settingsDialog" class="settings-dialog">
     <form method="dialog" class="settings-form">
-      <h2>可选：LLM 语言润色增强</h2>
-      <p class="settings-desc">默认使用<strong>纯本地检索引擎</strong>回答（零成本、可离线、答案 100% 来自知识库）。如需更自然的语言组织，可填入任意 OpenAI 兼容接口的 Key，LLM 仅被允许基于检索到的知识库片段改写措辞，不允许新增事实。</p>
+      <h2>可选：大模型全能模式</h2>
+      <p class="settings-desc">默认使用<strong>纯本地检索引擎</strong>回答（零成本、可离线、答案 100% 来自知识库）。填入任意 OpenAI 兼容接口的 Key 后升级为<strong>全能模式</strong>：大模型可自主调用四个工具——📚 气象知识库、🌦️ 气象 API（Open-Meteo）、🕐 时间 API（timeapi.io）、🔎 联网搜索（维基百科 + DuckDuckGo），可回答<strong>任意问题</strong>，不再限于知识库范围；气象专业问题仍强制先查知识库并引用来源。调用失败自动回退本地引擎。</p>
       <label>API Base URL
         <input type="text" id="llmBase" placeholder="https://api.openai.com/v1（或兼容接口）" />
       </label>

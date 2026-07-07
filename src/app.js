@@ -8,11 +8,13 @@ import {
   detectIntent, INTENT, extractLocation,
   buildKnowledgeAnswer, buildGreetingAnswer,
   fetchWeather, interpretWeather, gustLevel,
-  createContext, updateContext, polishWithLLM,
+  createContext, updateContext,
 } from './engine.js';
+import { runAgent } from './llm-agent.js';
 
 /* ---------- 状态 ---------- */
 const ctx = createContext();
+const chatHistory = []; // 全能模式的对话历史 [{role:'user'|'assistant', content}]
 const els = {
   messages: document.getElementById('messages'),
   input: document.getElementById('input'),
@@ -145,6 +147,56 @@ function adviceForRisk(interp) {
   return parts.join('；') + '。';
 }
 
+/* ---------- Markdown 轻量渲染（全能模式 LLM 输出用） ---------- */
+function renderMarkdown(md) {
+  const lines = esc(md).split('\n');
+  let html = '';
+  let inList = false, inTable = false;
+  const closeBlocks = () => {
+    if (inList) { html += '</ul>'; inList = false; }
+    if (inTable) { html += '</table>'; inTable = false; }
+  };
+  const inline = (s) => s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--accent-2)">$1</a>');
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (/^\|.*\|$/.test(line)) {
+      if (/^\|[\s:|-]+\|$/.test(line)) continue; // 分隔行
+      const cells = line.slice(1, -1).split('|').map((c) => inline(c.trim()));
+      if (!inTable) { closeBlocks(); html += '<table>'; inTable = true; html += `<tr>${cells.map((c) => `<th>${c}</th>`).join('')}</tr>`; }
+      else html += `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+      continue;
+    }
+    if (inTable) { html += '</table>'; inTable = false; }
+    const h = line.match(/^(#{1,4})\s+(.*)/);
+    if (h) { closeBlocks(); html += `<h4>${inline(h[2])}</h4>`; continue; }
+    const li = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)/);
+    if (li) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${inline(li[1])}</li>`;
+      continue;
+    }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (line.trim()) html += `<p>${inline(line)}</p>`;
+  }
+  closeBlocks();
+  return html;
+}
+
+function renderAgentAnswer(content, toolTrace) {
+  let html = renderMarkdown(content);
+  if (toolTrace.length) {
+    html += `<div class="sources">🛠 本次调用工具：${toolTrace.map((t) =>
+      `<span class="src-tag" title="${esc(JSON.stringify(t.args))}">${esc(t.label)}${t.ok ? '' : '（失败）'}</span>`).join('')}</div>`;
+  } else {
+    html += `<div class="sources">💬 由大模型直接回答（未调用工具）</div>`;
+  }
+  return html;
+}
+
 /* ---------- 主流程 ---------- */
 let busy = false;
 
@@ -156,6 +208,33 @@ async function handleUserInput(text) {
 
   addMsg('user', esc(query));
   const typing = addTyping();
+
+  // ===== 全能模式：配置了 LLM 后，任何问题都交给工具调用 Agent =====
+  const llm = getLLMConfig();
+  if (llm) {
+    try {
+      chatHistory.push({ role: 'user', content: query });
+      const setStatus = (s) => {
+        typing.querySelector('.bubble').innerHTML =
+          `<div class="typing"><span></span><span></span><span></span></div><p style="color:var(--text-dim);font-size:12.5px;margin-top:4px;">${esc(s)}</p>`;
+        scrollBottom();
+      };
+      const { content, toolTrace } = await runAgent(chatHistory.slice(-12), llm, setStatus);
+      chatHistory.push({ role: 'assistant', content });
+      typing.querySelector('.bubble').innerHTML = renderAgentAnswer(content, toolTrace);
+      updateContext(ctx, { userText: query, answer: { type: 'agent', entryId: null } });
+      busy = false;
+      els.btnSend.disabled = false;
+      scrollBottom();
+      return;
+    } catch (err) {
+      console.warn('全能模式失败，回退本地引擎：', err);
+      chatHistory.pop(); // 移除未成功的这轮
+      typing.querySelector('.bubble').innerHTML =
+        `<p style="color:var(--text-dim);font-size:12.5px;">⚠️ 大模型调用失败（${esc(err.message || '未知错误')}），已回退本地知识引擎。</p><div class="typing"><span></span><span></span><span></span></div>`;
+      // 继续走下方本地管线
+    }
+  }
 
   try {
     const intent = detectIntent(query);
@@ -198,19 +277,13 @@ async function handleUserInput(text) {
       }
     } else {
       answerPayload = buildKnowledgeAnswer(query, ctx);
-      // 可选 LLM 润色（仅对知识命中生效；失败静默回退本地答案）
-      const llm = getLLMConfig();
-      if (llm && answerPayload.type === 'knowledge') {
-        try {
-          answerPayload = await polishWithLLM(answerPayload, query, llm);
-        } catch (e) {
-          console.warn('LLM 润色失败，回退本地引擎：', e.message);
-        }
-      }
       html = renderAnswer(answerPayload);
     }
 
-    typing.querySelector('.bubble').innerHTML = html;
+    const notice = llm
+      ? `<p style="color:var(--warn);font-size:12px;margin-bottom:8px;">⚠️ 大模型调用失败，以下为本地知识引擎的回答。</p>`
+      : '';
+    typing.querySelector('.bubble').innerHTML = notice + html;
     updateContext(ctx, { userText: query, answer: answerPayload });
   } catch (err) {
     typing.querySelector('.bubble').innerHTML = `
@@ -302,6 +375,7 @@ els.btnClear.addEventListener('click', () => {
   ctx.turns = [];
   ctx.recentEntryIds = [];
   ctx.lastPlace = null;
+  chatHistory.length = 0;
   welcome();
 });
 
@@ -332,7 +406,7 @@ function refreshMode() {
   const llm = getLLMConfig();
   if (llm) {
     els.statusDot.classList.add('llm');
-    els.headerMode.textContent = `本地知识引擎 + LLM 润色（${llm.model}）`;
+    els.headerMode.textContent = `全能模式（${llm.model}）· 可回答任意问题，自动调用知识库/气象/时间/搜索工具`;
   } else {
     els.statusDot.classList.remove('llm');
     els.headerMode.textContent = '本地知识引擎 · 无需联网即可问答';

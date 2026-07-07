@@ -162,6 +162,45 @@ console.log('\n[F] 工具函数');
 check('风级换算：36 km/h ≈ 5 级', gustLevel(36) === 5, `实际: ${gustLevel(36)}`);
 check('风级换算：75 km/h ≈ 9 级', gustLevel(75) === 9, `实际: ${gustLevel(75)}`);
 
+/* ========== G. 全能模式：工具层与 Agent 循环（离线，LLM 用 mock） ========== */
+console.log('\n[G] 全能模式工具层');
+{
+  const { executeTool, TOOL_SCHEMAS } = await import('../src/tools.js');
+  const { runAgent } = await import('../src/llm-agent.js');
+
+  check('工具 Schema 注册 4 个工具', TOOL_SCHEMAS.length === 4);
+
+  const kbHit = await executeTool('search_knowledge_base', { query: '降水概率70%是什么意思' });
+  check('知识库工具：命中并携带来源', kbHit.found === true && kbHit.entries[0].sources.length > 0);
+
+  const kbMiss = await executeTool('search_knowledge_base', { query: '如何做红烧肉' });
+  check('知识库工具：未命中时引导 web_search', kbMiss.found === false && /web_search/.test(kbMiss.note));
+
+  const unknown = await executeTool('not_a_tool', {});
+  check('未知工具返回 error 而非抛异常', typeof unknown.error === 'string');
+
+  // mock 一个 OpenAI 兼容接口：第一轮返回工具调用，第二轮返回最终答案
+  let round = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('/chat/completions')) {
+      round++;
+      const body = round === 1
+        ? { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'search_knowledge_base', arguments: '{"query":"降水概率"}' } }] } }] }
+        : { choices: [{ message: { role: 'assistant', content: '基于知识库：降水概率70%表示出现降水的可能性是70%。（来源：气象学通用常识）' } }] };
+      return { ok: true, json: async () => body };
+    }
+    return realFetch(url, opts);
+  };
+  const result = await runAgent(
+    [{ role: 'user', content: '降水概率70%什么意思' }],
+    { base: 'https://mock.local/v1', key: 'test', model: 'mock' },
+  );
+  globalThis.fetch = realFetch;
+  check('Agent 循环：执行工具后产出最终回答', /70%/.test(result.content));
+  check('Agent 循环：toolTrace 记录调用过程', result.toolTrace.length === 1 && result.toolTrace[0].name === 'search_knowledge_base' && result.toolTrace[0].ok);
+}
+
 /* ========== 汇总 ========== */
 console.log('\n' + '='.repeat(50));
 console.log(`评测完成：通过 ${pass} / ${pass + fail}（准确率 ${((pass / (pass + fail)) * 100).toFixed(1)}%）`);

@@ -1,7 +1,7 @@
 {
   "name": "weather-interpretation-agent",
-  "version": "1.0.0",
-  "description": "气象预报解读助手：知识问答类 Agent（纯静态站点，零后端依赖）",
+  "version": "1.1.0",
+  "description": "气象预报解读助手：知识问答类 Agent，可选全能模式（LLM 工具调用：知识库/气象/时间/搜索）",
   "type": "module",
   "scripts": {
     "test": "node tests/eval.mjs",
