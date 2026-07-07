@@ -2,7 +2,11 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#faf9f5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="气象预报解读助手" />
   <title>气象预报解读助手</title>
   <meta name="description" content="气象预报解读助手：解释天气预报、预警预报、气象指标与 AI 气象预报模型，基于 WMO 指南与 GraphCast / Pangu-Weather 论文构建的知识问答 Agent。" />
   <link rel="stylesheet" href="assets/style.css" />
@@ -22,6 +26,10 @@
         </span>
       </div>
       <nav class="topbar-actions">
+        <button class="icon-btn" id="btnHistory" title="历史对话">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+          <span>历史对话</span>
+        </button>
         <button class="icon-btn" id="btnIdeas" title="提问灵感">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.7.5 1.1 1.3 1.2 2.1h4.6c.1-.8.5-1.6 1.2-2.1A6 6 0 0 0 12 3Z"/></svg>
           <span>提问灵感</span>
@@ -69,6 +77,24 @@
       </button>
     </div>
     <div class="ideas-body" id="suggestNav"></div>
+  </aside>
+
+  <!-- 历史对话抽屉 -->
+  <aside class="ideas-drawer" id="historyDrawer" aria-hidden="true">
+    <div class="ideas-head">
+      <h2>历史对话</h2>
+      <button class="icon-btn" id="btnCloseHistory" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="history-search">
+      <input type="search" id="historySearch" placeholder="搜索历史对话…" autocomplete="off" />
+    </div>
+    <div class="ideas-body" id="historyList"></div>
+    <div class="history-foot">
+      <button class="icon-btn" id="btnClearHistory">清空全部历史</button>
+      <span class="history-note">仅保存在本机浏览器</span>
+    </div>
   </aside>
   <div class="scrim" id="scrim" hidden></div>
 

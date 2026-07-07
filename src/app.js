@@ -12,10 +12,17 @@ import {
   createContext, updateContext,
 } from './engine.js';
 import { runAgent } from './llm-agent.js';
+import { moderateQuery, refusalMessage } from './moderation.js';
+import {
+  newSessionId, saveSession, getSession,
+  deleteSession, clearAllSessions, searchSessions, formatTime,
+} from './history.js';
 
 /* ---------- 状态 ---------- */
 const ctx = createContext();
 const chatHistory = []; // 全能模式的对话历史 [{role:'user'|'assistant', content}]
+let sessionId = null;   // 当前会话 id（首条消息时创建）
+let sessionCreatedAt = null;
 
 const els = {
   messages: document.getElementById('messages'),
@@ -31,6 +38,12 @@ const els = {
   scrim: document.getElementById('scrim'),
   btnIdeas: document.getElementById('btnIdeas'),
   btnCloseIdeas: document.getElementById('btnCloseIdeas'),
+  historyDrawer: document.getElementById('historyDrawer'),
+  historyList: document.getElementById('historyList'),
+  historySearch: document.getElementById('historySearch'),
+  btnHistory: document.getElementById('btnHistory'),
+  btnCloseHistory: document.getElementById('btnCloseHistory'),
+  btnClearHistory: document.getElementById('btnClearHistory'),
   btnClear: document.getElementById('btnClear'),
   statusDot: document.getElementById('statusDot'),
   headerMode: document.getElementById('headerMode'),
@@ -130,7 +143,8 @@ function renderAnswer(ans) {
 }
 
 function confBadge(conf) {
-  return `<span class="confidence ${conf}">${CONF_LABEL[conf] || conf}</span>`;
+  if (!conf || !CONF_LABEL[conf]) return '';
+  return `<span class="confidence ${conf}">${CONF_LABEL[conf]}</span>`;
 }
 
 /* ---------- 实时天气卡片渲染 ---------- */
@@ -222,14 +236,76 @@ function renderAgentAnswer(content, toolTrace) {
   return html;
 }
 
+/* ---------- 会话持久化 ---------- */
+let userTextsArr = [];
+
+function persistSession() {
+  const msgs = [...els.messages.children].map((div) => ({
+    role: div.classList.contains('user') ? 'user' : 'bot',
+    html: div.querySelector('.bubble').innerHTML,
+  }));
+  if (!msgs.length) return;
+  if (!sessionId) { sessionId = newSessionId(); sessionCreatedAt = Date.now(); }
+  saveSession({
+    id: sessionId,
+    title: (userTextsArr[0] || '新对话').slice(0, 40),
+    createdAt: sessionCreatedAt,
+    updatedAt: Date.now(),
+    messages: msgs,
+    chatHistory: [...chatHistory],
+    userTexts: [...userTextsArr],
+  });
+}
+
+function resetSession() {
+  els.messages.innerHTML = '';
+  ctx.turns = [];
+  ctx.recentEntryIds = [];
+  ctx.lastPlace = null;
+  chatHistory.length = 0;
+  userTextsArr = [];
+  sessionId = null;
+  sessionCreatedAt = null;
+  els.hero.classList.remove('hidden');
+  window.scrollTo({ top: 0 });
+}
+
+function loadSession(id) {
+  const s = getSession(id);
+  if (!s) return;
+  resetSession();
+  for (const m of s.messages) addMsg(m.role, m.html);
+  chatHistory.push(...(s.chatHistory || []));
+  userTextsArr = [...(s.userTexts || [])];
+  sessionId = s.id;
+  sessionCreatedAt = s.createdAt;
+}
+
 /* ---------- 主流程 ---------- */
 let busy = false;
 
 async function handleUserInput(text) {
   const query = text.trim();
   if (!query || busy) return;
+
+  // ===== 前置内容分类：敏感/政治类问题直接拒答，不进入任何后续管线 =====
+  const mod = moderateQuery(query);
+  if (mod.blocked) {
+    addMsg('user', esc(query));
+    addMsg('bot', renderAnswer({
+      type: 'refusal-sensitive',
+      structured: refusalMessage(mod.category),
+      sources: [], safety: false,
+      followups: ['降水概率 70% 是什么意思？', '现在深圳的天气怎么样？', '什么是影响预报？'],
+    }));
+    userTextsArr.push(query);
+    persistSession();
+    return;
+  }
+
   busy = true;
   els.btnSend.disabled = true;
+  userTextsArr.push(query);
 
   addMsg('user', esc(query));
   const typing = addTyping();
@@ -250,6 +326,7 @@ async function handleUserInput(text) {
       updateContext(ctx, { userText: query, answer: { type: 'agent', entryId: null } });
       busy = false;
       els.btnSend.disabled = false;
+      persistSession();
       scrollBottom();
       return;
     } catch (err) {
@@ -318,6 +395,7 @@ async function handleUserInput(text) {
   } finally {
     busy = false;
     els.btnSend.disabled = false;
+    persistSession();
     scrollBottom();
   }
 }
@@ -359,10 +437,40 @@ function initIdeas() {
     </div>`).join('');
 }
 
+function setDrawer(drawer, open) {
+  drawer.classList.toggle('open', open);
+  drawer.setAttribute('aria-hidden', String(!open));
+  els.scrim.hidden = !(els.ideasDrawer.classList.contains('open') || els.historyDrawer.classList.contains('open'));
+}
 function openIdeas(open) {
-  els.ideasDrawer.classList.toggle('open', open);
-  els.ideasDrawer.setAttribute('aria-hidden', String(!open));
-  els.scrim.hidden = !open;
+  if (open) setDrawer(els.historyDrawer, false);
+  setDrawer(els.ideasDrawer, open);
+}
+function openHistory(open) {
+  if (open) {
+    setDrawer(els.ideasDrawer, false);
+    renderHistoryList(els.historySearch.value);
+  }
+  setDrawer(els.historyDrawer, open);
+}
+
+/* ---------- 历史对话列表 ---------- */
+const DEL_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+
+function renderHistoryList(query = '') {
+  const sessions = searchSessions(query);
+  if (!sessions.length) {
+    els.historyList.innerHTML = `<p class="history-empty">${query ? '没有匹配的历史对话' : '暂无历史对话。开始提问后会自动保存在本机。'}</p>`;
+    return;
+  }
+  els.historyList.innerHTML = sessions.map((s) => `
+    <div class="history-item${s.id === sessionId ? ' active' : ''}" data-sid="${esc(s.id)}" role="button" tabindex="0">
+      <div class="history-main">
+        <span class="history-title">${esc(s.title)}</span>
+        <span class="history-meta">${formatTime(s.updatedAt)} · ${(s.userTexts || []).length} 次提问</span>
+      </div>
+      <button class="history-del" data-del="${esc(s.id)}" title="删除该对话" aria-label="删除">${DEL_ICON}</button>
+    </div>`).join('');
 }
 
 /* ---------- 事件绑定 ---------- */
@@ -396,19 +504,44 @@ document.addEventListener('click', (e) => {
 });
 
 els.btnClear.addEventListener('click', () => {
-  els.messages.innerHTML = '';
-  ctx.turns = [];
-  ctx.recentEntryIds = [];
-  ctx.lastPlace = null;
-  chatHistory.length = 0;
-  els.hero.classList.remove('hidden');
-  window.scrollTo({ top: 0 });
+  persistSession();
+  resetSession();
 });
 
 els.btnIdeas.addEventListener('click', () => openIdeas(true));
 els.btnCloseIdeas.addEventListener('click', () => openIdeas(false));
-els.scrim.addEventListener('click', () => openIdeas(false));
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') openIdeas(false); });
+els.btnHistory.addEventListener('click', () => openHistory(true));
+els.btnCloseHistory.addEventListener('click', () => openHistory(false));
+els.scrim.addEventListener('click', () => { openIdeas(false); openHistory(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { openIdeas(false); openHistory(false); } });
+
+// 历史抽屉：搜索 / 载入 / 删除 / 清空
+els.historySearch.addEventListener('input', () => renderHistoryList(els.historySearch.value));
+
+els.historyList.addEventListener('click', (e) => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    e.stopPropagation();
+    deleteSession(del.dataset.del);
+    if (del.dataset.del === sessionId) sessionId = null;
+    renderHistoryList(els.historySearch.value);
+    return;
+  }
+  const item = e.target.closest('[data-sid]');
+  if (item) {
+    persistSession();
+    loadSession(item.dataset.sid);
+    openHistory(false);
+  }
+});
+
+els.btnClearHistory.addEventListener('click', () => {
+  if (confirm('确定清空全部历史对话吗？此操作不可恢复。')) {
+    clearAllSessions();
+    sessionId = null;
+    renderHistoryList('');
+  }
+});
 
 function refreshMode() {
   els.statusDot.classList.add('llm');
