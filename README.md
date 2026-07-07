@@ -29,7 +29,7 @@ python3 -m http.server 8080
 node tests/eval.mjs
 ```
 
-评测集含 75 项断言：45 个检索准确性用例（含口语化变体）、4 个库外拒答用例、8 个意图识别用例、3 个地点抽取用例、多轮上下文用例、知识库结构完整性检查、全能模式工具层与 Agent 循环测试（LLM 用 mock，离线可跑）。当前通过率 100%。
+评测集含 94 项断言：45 个检索准确性用例（含口语化变体）、4 个库外拒答用例、8 个意图识别用例、3 个地点抽取用例、多轮上下文用例、知识库结构完整性检查、全能模式工具层与 Agent 循环测试（LLM 用 mock，离线可跑）、敏感内容分类拒答（含防误伤负例）、历史会话存储。当前通过率 100%。
 
 ## 发布到公网（任选其一，均免费）
 
@@ -68,7 +68,9 @@ npx wrangler pages deploy .
 │   ├── tools.js        # 全能模式工具层：知识库/气象/时间/搜索四个工具的 Schema 与执行器
 │   ├── llm-agent.js    # 全能模式 Agent 循环（OpenAI 兼容 function calling，最多 6 轮）
 │   └── app.js          # UI 层：渲染、事件、上下文串联、模式切换
-├── tests/eval.mjs      # 自动化评测集（75 项断言）
+│   ├── moderation.js   # 敏感内容分类拦截（4 类词表，命中即拒答）
+│   ├── history.js      # 历史对话存储（localStorage，搜索/载入/删除）
+├── tests/eval.mjs      # 自动化评测集（94 项断言）
 ├── package.json
 └── README.md
 ```
