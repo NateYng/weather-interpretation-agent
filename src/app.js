@@ -1,6 +1,7 @@
 /**
  * 气象预报解读助手 · UI 层
- * 负责：消息渲染、推荐问题、实时天气卡片、设置（可选 LLM）、多轮上下文串联
+ * 负责：消息渲染、Hero 空状态与建议卡片、提问灵感抽屉、
+ *       设置（全能模式）、多轮上下文串联
  */
 
 import { KB } from './kb.js';
@@ -15,22 +16,29 @@ import { runAgent } from './llm-agent.js';
 /* ---------- 状态 ---------- */
 const ctx = createContext();
 const chatHistory = []; // 全能模式的对话历史 [{role:'user'|'assistant', content}]
+
 const els = {
   messages: document.getElementById('messages'),
   input: document.getElementById('input'),
   form: document.getElementById('composerForm'),
   btnSend: document.getElementById('btnSend'),
-  suggestNav: document.getElementById('suggestNav'),
-  quickChips: document.getElementById('quickChips'),
+  hero: document.getElementById('hero'),
+  heroGreeting: document.getElementById('heroGreeting'),
+  heroCards: document.getElementById('heroCards'),
   kbStats: document.getElementById('kbStats'),
+  suggestNav: document.getElementById('suggestNav'),
+  ideasDrawer: document.getElementById('ideasDrawer'),
+  scrim: document.getElementById('scrim'),
+  btnIdeas: document.getElementById('btnIdeas'),
+  btnCloseIdeas: document.getElementById('btnCloseIdeas'),
   btnClear: document.getElementById('btnClear'),
   btnSettings: document.getElementById('btnSettings'),
   settingsDialog: document.getElementById('settingsDialog'),
   statusDot: document.getElementById('statusDot'),
   headerMode: document.getElementById('headerMode'),
-  sidebar: document.getElementById('sidebar'),
-  btnToggleSidebar: document.getElementById('btnToggleSidebar'),
 };
+
+const BOT_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.42-8.98 6 6 0 1 0-11.06 3.1A3.5 3.5 0 0 0 7 19h10.5Z"/></svg>`;
 
 function getLLMConfig() {
   try {
@@ -47,15 +55,20 @@ function esc(s) {
 }
 
 function scrollBottom() {
-  els.messages.scrollTop = els.messages.scrollHeight;
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+function hideHero() {
+  els.hero.classList.add('hidden');
 }
 
 function addMsg(role, html) {
+  hideHero();
   const div = document.createElement('div');
   div.className = `msg ${role}`;
-  div.innerHTML = `
-    <div class="avatar">${role === 'user' ? '🧑' : '🌦️'}</div>
-    <div class="bubble">${html}</div>`;
+  div.innerHTML = role === 'user'
+    ? `<div class="bubble">${html}</div>`
+    : `<div class="avatar">${BOT_GLYPH}</div><div class="bubble">${html}</div>`;
   els.messages.appendChild(div);
   scrollBottom();
   return div;
@@ -67,17 +80,17 @@ function addTyping() {
 
 /* ---------- 结构化回答渲染 ---------- */
 const SECTION_META = [
-  ['conclusion', '📌 结论'],
-  ['explain', '💡 解释'],
-  ['impact', '🎯 影响'],
-  ['advice', '✅ 建议'],
+  ['conclusion', '结论'],
+  ['explain', '解释'],
+  ['impact', '影响'],
+  ['advice', '建议'],
 ];
 
 const CONF_LABEL = { high: '知识库直接命中', mid: '近似匹配', low: '未命中' };
 
 function renderAnswer(ans) {
   let html = '';
-  if (ans.clarify) html += `<p style="color:var(--text-dim);font-size:13px;">🔍 ${esc(ans.clarify)}</p>`;
+  if (ans.clarify) html += `<p class="status-line">${esc(ans.clarify)}</p>`;
 
   for (const [key, label] of SECTION_META) {
     const val = ans.structured[key];
@@ -86,15 +99,11 @@ function renderAnswer(ans) {
   }
 
   if (ans.safety) {
-    html += `<div class="safety-note">⚠️ 涉及安全或作业决策时，请以当地气象部门发布的最新官方预报和预警为准。</div>`;
+    html += `<div class="safety-note">涉及安全或作业决策时，请以当地气象部门发布的最新官方预报和预警为准。</div>`;
   }
 
   if (ans.sources && ans.sources.length) {
-    html += `<div class="sources">📚 依据来源：${ans.sources.map((s) => `<span class="src-tag" title="${esc(s.file)}">${esc(s.name)}</span>`).join('')}</div>`;
-  }
-
-  if (ans.llmPolished) {
-    html += `<div class="sources" style="border-top:none;padding-top:0;">✨ 已由 LLM 基于知识库片段润色（未新增事实）</div>`;
+    html += `<div class="sources">依据来源 ${ans.sources.map((s) => `<span class="src-tag" title="${esc(s.file)}">${esc(s.name)}</span>`).join('')}</div>`;
   }
 
   if (ans.followups && ans.followups.length) {
@@ -108,28 +117,27 @@ function confBadge(conf) {
 }
 
 /* ---------- 实时天气卡片渲染 ---------- */
-function renderWeatherCard(interp, place) {
+function renderWeatherCard(interp) {
   const c = interp.current;
   const riskColor = interp.riskLevel === '较高' ? 'low' : interp.riskLevel === '中等' ? 'mid' : 'high';
-  let html = `<h4>📌 结论</h4>
-    <p><strong>${esc(interp.placeName)}</strong> 当前 ${esc(c.text)}，气温 ${c.temp}℃，湿度 ${c.humidity}%，风速 ${c.wind} km/h（阵风 ${c.gust} km/h，约 ${gustLevel(c.gust)} 级）。未来 12 小时综合天气风险：<span class="confidence ${riskColor}">${interp.riskLevel}</span></p>`;
+  let html = `<h4>结论</h4>
+    <p><strong>${esc(interp.placeName)}</strong> 当前 ${esc(c.text)}，气温 ${c.temp}℃，湿度 ${c.humidity}%，风速 ${c.wind} km/h（阵风 ${c.gust} km/h，约 ${gustLevel(c.gust)} 级）。未来 12 小时综合天气风险 <span class="confidence ${riskColor}">${interp.riskLevel}</span></p>`;
 
   if (interp.risks.length) {
-    html += `<h4>🎯 风险识别</h4><ul>${interp.risks.map((r) => `<li>${r.level === 'high' ? '🔴' : r.level === 'mid' ? '🟡' : '🟢'} ${esc(r.text)}</li>`).join('')}</ul>`;
+    html += `<h4>风险识别</h4><ul>${interp.risks.map((r) => `<li>${r.level === 'high' ? '🔴' : r.level === 'mid' ? '🟡' : '🟢'} ${esc(r.text)}</li>`).join('')}</ul>`;
   } else {
-    html += `<h4>🎯 风险识别</h4><p>🟢 未来 12 小时各项指标均在常规范围内，无明显天气风险信号。</p>`;
+    html += `<h4>风险识别</h4><p>🟢 未来 12 小时各项指标均在常规范围内，无明显天气风险信号。</p>`;
   }
 
-  // 逐小时表（取 8 行避免过长）
   const rows = interp.rows.slice(0, 8);
-  html += `<h4>💡 逐小时依据（未来 ${rows.length} 小时）</h4>
+  html += `<h4>逐小时依据（未来 ${rows.length} 小时）</h4>
   <table><tr><th>时间</th><th>气温℃</th><th>降水概率</th><th>降水mm</th><th>阵风km/h</th></tr>
   ${rows.map((r) => `<tr><td>${r.time}</td><td>${r.temp}</td><td>${r.pop ?? '—'}%</td><td>${r.precip}</td><td>${r.gust}</td></tr>`).join('')}
   </table>`;
 
-  html += `<h4>✅ 建议</h4><p>${adviceForRisk(interp)}</p>`;
-  html += `<div class="safety-note">⚠️ 以上为 Open-Meteo 模式预报的自动解读，仅供参考。涉及安全、作业、出行的决策，请以当地气象部门最新官方预报和预警为准。</div>`;
-  html += `<div class="sources">📚 数据来源：<span class="src-tag">Open-Meteo Forecast API（实时调用）</span><span class="src-tag">解读规则依据知识库阈值条目</span></div>`;
+  html += `<h4>建议</h4><p>${adviceForRisk(interp)}</p>`;
+  html += `<div class="safety-note">以上为 Open-Meteo 模式预报的自动解读，仅供参考。涉及安全、作业、出行的决策，请以当地气象部门最新官方预报和预警为准。</div>`;
+  html += `<div class="sources">数据来源 <span class="src-tag">Open-Meteo Forecast API（实时调用）</span><span class="src-tag">解读规则依据知识库阈值条目</span></div>`;
   html += `<div class="followups">
     <button class="followup-chip" data-q="降水概率 70% 是什么意思？">降水概率是什么意思？</button>
     <button class="followup-chip" data-q="阵风和平均风速有什么区别？">阵风和平均风速的区别</button>
@@ -159,7 +167,7 @@ function renderMarkdown(md) {
   const inline = (s) => s
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--accent-2)">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
   for (const raw of lines) {
     const line = raw.trimEnd();
@@ -189,10 +197,10 @@ function renderMarkdown(md) {
 function renderAgentAnswer(content, toolTrace) {
   let html = renderMarkdown(content);
   if (toolTrace.length) {
-    html += `<div class="sources">🛠 本次调用工具：${toolTrace.map((t) =>
+    html += `<div class="sources">本次调用工具 ${toolTrace.map((t) =>
       `<span class="src-tag" title="${esc(JSON.stringify(t.args))}">${esc(t.label)}${t.ok ? '' : '（失败）'}</span>`).join('')}</div>`;
   } else {
-    html += `<div class="sources">💬 由大模型直接回答（未调用工具）</div>`;
+    html += `<div class="sources">由大模型直接回答（未调用工具）</div>`;
   }
   return html;
 }
@@ -216,7 +224,7 @@ async function handleUserInput(text) {
       chatHistory.push({ role: 'user', content: query });
       const setStatus = (s) => {
         typing.querySelector('.bubble').innerHTML =
-          `<div class="typing"><span></span><span></span><span></span></div><p style="color:var(--text-dim);font-size:12.5px;margin-top:4px;">${esc(s)}</p>`;
+          `<div class="typing"><span></span><span></span><span></span></div><p class="status-line">${esc(s)}</p>`;
         scrollBottom();
       };
       const { content, toolTrace } = await runAgent(chatHistory.slice(-12), llm, setStatus);
@@ -231,7 +239,7 @@ async function handleUserInput(text) {
       console.warn('全能模式失败，回退本地引擎：', err);
       chatHistory.pop(); // 移除未成功的这轮
       typing.querySelector('.bubble').innerHTML =
-        `<p style="color:var(--text-dim);font-size:12.5px;">⚠️ 大模型调用失败（${esc(err.message || '未知错误')}），已回退本地知识引擎。</p><div class="typing"><span></span><span></span><span></span></div>`;
+        `<p class="fallback-note">大模型调用失败（${esc(err.message || '未知错误')}），已回退本地知识引擎。</p><div class="typing"><span></span><span></span><span></span></div>`;
       // 继续走下方本地管线
     }
   }
@@ -272,7 +280,7 @@ async function handleUserInput(text) {
         } else {
           const interp = interpretWeather(data);
           answerPayload = { type: 'realtime', entryId: null, place };
-          html = renderWeatherCard(interp, place);
+          html = renderWeatherCard(interp);
         }
       }
     } else {
@@ -281,15 +289,15 @@ async function handleUserInput(text) {
     }
 
     const notice = llm
-      ? `<p style="color:var(--warn);font-size:12px;margin-bottom:8px;">⚠️ 大模型调用失败，以下为本地知识引擎的回答。</p>`
+      ? `<p class="fallback-note">大模型调用失败，以下为本地知识引擎的回答。</p>`
       : '';
     typing.querySelector('.bubble').innerHTML = notice + html;
     updateContext(ctx, { userText: query, answer: answerPayload });
   } catch (err) {
     typing.querySelector('.bubble').innerHTML = `
-      <h4>📌 出错了</h4>
+      <h4>出错了</h4>
       <p>${esc(err.message || '未知错误')}</p>
-      <p style="color:var(--text-dim);font-size:13px;">实时天气功能需要联网；知识问答不受影响，可继续提问。</p>`;
+      <p class="status-line">实时天气功能需要联网；知识问答不受影响，可继续提问。</p>`;
   } finally {
     busy = false;
     els.btnSend.disabled = false;
@@ -297,17 +305,31 @@ async function handleUserInput(text) {
   }
 }
 
-/* ---------- 初始化：侧边栏推荐问题 ---------- */
-function initSidebar() {
-  // 知识库统计
+/* ---------- 初始化：Hero 与提问灵感 ---------- */
+const HERO_CARDS = [
+  { cat: '指标解读', q: '降水概率 70% 是什么意思？是不是一定会下雨？' },
+  { cat: '实时天气', q: '现在深圳的天气适合户外活动吗？' },
+  { cat: 'AI 气象模型', q: 'GraphCast 和传统数值天气预报有什么不同？' },
+  { cat: '预警知识', q: '气象预警信号的蓝、黄、橙、红分别代表什么？' },
+];
+
+function initHero() {
+  const hour = new Date().getHours();
+  const greet = hour < 6 ? '夜深了。' : hour < 12 ? '早上好。' : hour < 18 ? '下午好。' : '晚上好。';
+  els.heroGreeting.textContent = `${greet}把预报，讲成人话。`;
+
+  els.heroCards.innerHTML = HERO_CARDS.map((c) => `
+    <button class="hero-card" data-q="${esc(c.q)}">
+      <span class="cat">${esc(c.cat)}</span>
+      <span class="q">${esc(c.q)}</span>
+    </button>`).join('');
+
   const cats = new Set(KB.map((e) => e.category));
   const srcCount = new Set(KB.flatMap((e) => e.sources)).size;
-  els.kbStats.innerHTML = `
-    <div class="kb-stat"><b>${KB.length}</b><span>知识条目</span></div>
-    <div class="kb-stat"><b>${cats.size}</b><span>主题分类</span></div>
-    <div class="kb-stat"><b>${srcCount}</b><span>依据来源</span></div>`;
+  els.kbStats.innerHTML = `知识库收录 <b>${KB.length}</b> 个问题单元 · <b>${cats.size}</b> 个主题 · <b>${srcCount}</b> 类可追溯来源 · 库外问题明确拒答`;
+}
 
-  // 按分类分组推荐问题（每类取前 3）
+function initIdeas() {
   const groups = {};
   for (const e of KB) {
     if (e.category === '关于助手') continue;
@@ -316,28 +338,14 @@ function initSidebar() {
   els.suggestNav.innerHTML = Object.entries(groups).map(([cat, entries]) => `
     <div class="suggest-group">
       <h3>${esc(cat)}</h3>
-      ${entries.slice(0, 3).map((e) => `<button class="suggest-item" data-q="${esc(e.title)}">${esc(e.title)}</button>`).join('')}
+      ${entries.map((e) => `<button class="suggest-item" data-q="${esc(e.title)}">${esc(e.title)}</button>`).join('')}
     </div>`).join('');
-
-  // 快捷chips
-  const quicks = [
-    '降水概率 70% 是什么意思？',
-    'GraphCast 是什么？',
-    '现在深圳的天气适合户外活动吗？',
-    '橙色预警要停工吗？',
-  ];
-  els.quickChips.innerHTML = quicks.map((q) => `<button class="followup-chip" data-q="${esc(q)}">${esc(q)}</button>`).join('');
 }
 
-function welcome() {
-  const ans = buildGreetingAnswer();
-  ans.structured = {
-    conclusion: '你好，我是气象预报解读助手 🌦️',
-    explain: '我的知识库基于 WMO《多灾种影响预报与预警指南》、GraphCast / Pangu-Weather 论文和 Open-Meteo API 文档构建，覆盖气象指标解读、预报产品、预警与影响预报、AI 气象模型、数据接口和服务沟通六大主题。每条回答都会标注依据来源；知识库没有依据时我会直接说明，不编造答案。',
-    impact: '我还能实时查询任意城市的天气预报，并按知识库中的阈值规则自动解读风险。',
-    advice: '从左侧推荐问题开始，或直接输入你的问题。',
-  };
-  addMsg('bot', renderAnswer(ans));
+function openIdeas(open) {
+  els.ideasDrawer.classList.toggle('open', open);
+  els.ideasDrawer.setAttribute('aria-hidden', String(!open));
+  els.scrim.hidden = !open;
 }
 
 /* ---------- 事件绑定 ---------- */
@@ -358,15 +366,15 @@ els.input.addEventListener('keydown', (e) => {
 
 els.input.addEventListener('input', () => {
   els.input.style.height = 'auto';
-  els.input.style.height = Math.min(els.input.scrollHeight, 140) + 'px';
+  els.input.style.height = Math.min(els.input.scrollHeight, 160) + 'px';
 });
 
-// 事件委托：推荐问题 / 追问 chips
+// 事件委托：Hero 卡片 / 推荐问题 / 追问 chips
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-q]');
   if (btn) {
+    openIdeas(false);
     handleUserInput(btn.dataset.q);
-    els.sidebar.classList.remove('open');
   }
 });
 
@@ -376,10 +384,14 @@ els.btnClear.addEventListener('click', () => {
   ctx.recentEntryIds = [];
   ctx.lastPlace = null;
   chatHistory.length = 0;
-  welcome();
+  els.hero.classList.remove('hidden');
+  window.scrollTo({ top: 0 });
 });
 
-els.btnToggleSidebar?.addEventListener('click', () => els.sidebar.classList.toggle('open'));
+els.btnIdeas.addEventListener('click', () => openIdeas(true));
+els.btnCloseIdeas.addEventListener('click', () => openIdeas(false));
+els.scrim.addEventListener('click', () => openIdeas(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') openIdeas(false); });
 
 // 设置弹窗
 els.btnSettings.addEventListener('click', () => {
@@ -406,14 +418,16 @@ function refreshMode() {
   const llm = getLLMConfig();
   if (llm) {
     els.statusDot.classList.add('llm');
-    els.headerMode.textContent = `全能模式（${llm.model}）· 可回答任意问题，自动调用知识库/气象/时间/搜索工具`;
+    els.headerMode.textContent = `全能模式 · ${llm.model}`;
+    els.headerMode.parentElement.title = '大模型自主调用知识库 / 气象 / 时间 / 搜索四个工具，可回答任意问题';
   } else {
     els.statusDot.classList.remove('llm');
-    els.headerMode.textContent = '本地知识引擎 · 无需联网即可问答';
+    els.headerMode.textContent = '本地知识引擎';
+    els.headerMode.parentElement.title = '零成本、可离线，答案 100% 来自知识库；在设置中配置模型可升级全能模式';
   }
 }
 
 /* ---------- 启动 ---------- */
-initSidebar();
+initHero();
+initIdeas();
 refreshMode();
-welcome();
